@@ -21,6 +21,16 @@ CERTS_DIR = os.path.join(BASE_DIR, "certs")
 CERT_FILE = os.path.join(CERTS_DIR, "server.crt")
 KEY_FILE = os.path.join(CERTS_DIR, "server.key")
 
+# --- Reliable TCP Socket Recv Helper ---
+def recv_exact(sock, n):
+    data = bytearray()
+    while len(data) < n:
+        packet = sock.recv(n - len(data))
+        if not packet:
+            return None
+        data.extend(packet)
+    return bytes(data)
+
 # --- S/MIME Email Notification Function ---
 def send_email_notification(subject, body):
     sender_email = os.environ.get("SENDER_EMAIL", "bl.en.u4cse21142@bl.students.amrita.edu")
@@ -32,6 +42,10 @@ def send_email_notification(subject, body):
         return
 
     try:
+        if not os.path.exists(CERT_FILE) or not os.path.exists(KEY_FILE):
+            print("[NOTIF] Skip S/MIME email (Certificates not found).")
+            return
+
         with open(CERT_FILE, "rb") as cert_f:
             cert_data = cert_f.read()
         with open(KEY_FILE, "rb") as key_f:
@@ -66,28 +80,35 @@ def send_email_notification(subject, body):
         print(f"[NOTIF ERROR] Failed to send email notification: {e}")
 
 
-# --- QKD Key Exchange (BB84 Protocol Simulation) ---
+# --- BB84 Quantum Key Distribution (QKD) Protocol Simulation ---
 def qkd_key_exchange(client_socket):
     print("\n[QKD] Initiating BB84 Quantum Key Exchange Simulation...")
     key_size = 128
     
+    # 1. Server generates random photon bases (0 = Rectilinear +, 1 = Diagonal x) & bits
     server_bases = [random.randint(0, 1) for _ in range(key_size)]
     server_bits = [random.randint(0, 1) for _ in range(key_size)]
     
+    # Transmit bases and bits over secure channel
     client_socket.sendall(bytes(server_bases))
     client_socket.sendall(bytes(server_bits))
     
-    client_bases = list(client_socket.recv(key_size))
+    # 2. Receive Client's measurement bases
+    client_bases_raw = recv_exact(client_socket, key_size)
+    if not client_bases_raw:
+        raise Exception("QKD failed: Client disconnected during basis exchange.")
+    client_bases = list(client_bases_raw)
     
-    shared_key = []
+    # 3. Sift bases: keep bits where bases match
+    sifted_key = []
     for i in range(key_size):
         if server_bases[i] == client_bases[i]:
-            shared_key.append(server_bits[i])
+            sifted_key.append(server_bits[i])
     
-    shared_key_str = ''.join(map(str, shared_key[:len(shared_key)//2]))
-    print(f"[QKD] Negotiated Shared QKD Key (Sifted): {shared_key_str[:32]}...")
+    sifted_key_str = ''.join(map(str, sifted_key[:len(sifted_key)//2]))
+    print(f"[QKD SUCCESS] Negotiated Quantum Secret Key (Sifted): {sifted_key_str[:32]}...")
     
-    return bytes(shared_key[:len(shared_key)//2])
+    return bytes(sifted_key[:len(sifted_key)//2])
 
 
 # --- Client Session Handler ---
@@ -96,18 +117,18 @@ clients = {}
 def handle_client(client_socket, client_address, client_id):
     start_time = datetime.now()
     try:
-        print(f"\n[CLIENT CONNECTED] Address: {client_address} | Assigned ID: {client_id}")
+        print(f"\n[CLIENT CONNECTED] Address: {client_address} | Assigned Client ID: {client_id}")
 
         send_email_notification(
             subject="Secure Server Alert: New Client Connected",
             body=f"Client Connected:\nAddress: {client_address}\nClient ID: {client_id}\nTime: {start_time}"
         )
         
-        # 1. Quantum Key Exchange (BB84)
-        qkd_symmetric_key = qkd_key_exchange(client_socket)
-        print(f"[CLIENT {client_id}] QKD Shared Key (Hex): {qkd_symmetric_key.hex()}")
+        # 1. Execute Quantum Key Distribution (BB84 Protocol)
+        qkd_key = qkd_key_exchange(client_socket)
+        print(f"[CLIENT {client_id}] QKD Negotiated Key (Hex): {qkd_key.hex()}")
         
-        # 2. RSA Key Pair Generation for Server
+        # 2. Generate Server RSA-2048 Key Pair
         server_private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
         server_public_key = server_private_key.public_key()
         
@@ -118,18 +139,22 @@ def handle_client(client_socket, client_address, client_id):
         client_socket.sendall(server_public_pem)
         
         # 3. Receive Client's RSA Public Key
-        client_public_pem = client_socket.recv(2048)
+        client_public_pem = recv_exact(client_socket, 451) # 2048-bit SubjectPublicKeyInfo PEM is 451 bytes
+        if not client_public_pem:
+            # Fallback if size varies slightly
+            client_public_pem = client_socket.recv(2048)
         client_public_key = serialization.load_pem_public_key(client_public_pem)
         
-        clients[client_id] = (client_socket, server_private_key, client_public_key, qkd_symmetric_key)
-        print(f"[CLIENT {client_id}] Handshake Complete. Ready for secure message relay.")
+        clients[client_id] = (client_socket, server_private_key, client_public_key, qkd_key)
+        print(f"[CLIENT {client_id}] SSL + QKD + RSA Handshake Complete. Ready for encrypted messaging.")
         
-        # 4. Message Reception & Cryptographic Processing Loop
+        # 4. Message Handling Loop
         while True:
-            raw_message = client_socket.recv(4096).decode('utf-8')
-            if not raw_message:
+            raw_data = client_socket.recv(4096)
+            if not raw_data:
                 break
 
+            raw_message = raw_data.decode('utf-8')
             if ':' in raw_message:
                 parts = raw_message.split(':', 2)
                 if len(parts) < 3:
@@ -142,7 +167,7 @@ def handle_client(client_socket, client_address, client_id):
                 
                 print(f"\n[CLIENT {client_id} -> RECIPIENT {recipient_id}] Encrypted Payload Received ({len(encrypted_data)} bytes)")
                 
-                # A. Digital Signature Verification (RSA PSS + SHA256)
+                # A. Verify RSA PSS Digital Signature using Client Public Key
                 try:
                     sender_pub_key = clients[client_id][2]
                     sender_pub_key.verify(
@@ -154,7 +179,7 @@ def handle_client(client_socket, client_address, client_id):
                         ),
                         hashes.SHA256()
                     )
-                    print(f"[CLIENT {client_id}] Digital Signature VERIFIED (Authenticity & Integrity Intact).")
+                    print(f"[CLIENT {client_id}] RSA PSS Digital Signature VERIFIED (Integrity & Authenticity Confirmed).")
                 except Exception as sig_err:
                     client_socket.sendall("Security Error: Signature verification failed!".encode('utf-8'))
                     print(f"[SECURITY ALERT] Signature Verification Failed for Client {client_id}: {sig_err}")
@@ -179,20 +204,20 @@ def handle_client(client_socket, client_address, client_id):
                 decryptor = cipher.decryptor()
                 decrypted_message = (decryptor.update(encrypted_payload) + decryptor.finalize()).decode('utf-8')
 
-                print(f"[DECRYPTED CONTENT] Client {client_id} says: '{decrypted_message}'")
+                print(f"[DECRYPTED CONTENT] Client {client_id} sent: '{decrypted_message}'")
 
                 # D. Forward Decrypted Message to Target Recipient
                 if recipient_id in clients:
                     recipient_socket = clients[recipient_id][0]
                     recipient_socket.sendall(f"From Client {client_id}: {decrypted_message}".encode('utf-8'))
-                    print(f"[ROUTING] Message forwarded to Recipient ID {recipient_id}")
+                    print(f"[ROUTING] Message forwarded to Client ID {recipient_id}")
                 else:
                     client_socket.sendall(f"Error: Recipient ID '{recipient_id}' not online.".encode('utf-8'))
             else:
                 client_socket.sendall("Error: Invalid message format. Use 'recipient_id:encrypted_data:signature'.".encode('utf-8'))
 
     except Exception as err:
-        print(f"[CLIENT ERROR] Error handling Client {client_id}: {err}")
+        print(f"[CLIENT DISCONNECT / ERROR] Client {client_id}: {err}")
     finally:
         end_time = datetime.now()
         duration = end_time - start_time
@@ -211,7 +236,7 @@ def handle_client(client_socket, client_address, client_id):
 # --- Main Server Entry Point ---
 def main():
     if not os.path.exists(CERT_FILE) or not os.path.exists(KEY_FILE):
-        print(f"Error: Certificate or key missing at '{CERTS_DIR}'. Please generate server.crt and server.key.")
+        print(f"Error: Certificate or key missing at '{CERTS_DIR}'. Please run ./scripts/generate_certs.sh.")
         sys.exit(1)
 
     context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
@@ -225,7 +250,7 @@ def main():
     ssl_server_socket = context.wrap_socket(raw_socket, server_side=True)
 
     print("==========================================================================")
-    print("  Secure Client-Server Communication System (SSL/TLS + RSA + AES Hybrid)")
+    print("  Unified Secure Client-Server System (SSL/TLS + QKD + Hybrid RSA-AES)")
     print("==========================================================================")
     print("Server initialized and listening securely on port 9999...")
 

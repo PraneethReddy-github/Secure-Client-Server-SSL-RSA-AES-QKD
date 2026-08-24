@@ -1,119 +1,103 @@
-# Secure Client-Server Communication System Using SSL/TLS and Hybrid RSA-AES Encryption
+# Unified Secure Client-Server Communication System (SSL/TLS + BB84 QKD + Hybrid RSA-AES)
 
-[![Python 3.8+](https://img.shields.io/badge/Language-Python%203.8%2B-blue.svg)](https://www.python.org/)
-[![SSL/TLS](https://img.shields.io/badge/Security-SSL%2FTLS%20Socket-green.svg)](https://docs.python.org/3/library/ssl.html)
-[![RSA 2048](https://img.shields.io/badge/Asymmetric-RSA--2048%20OAEP%2FPSS-orange.svg)](https://cryptography.io/)
-[![AES 256](https://img.shields.io/badge/Symmetric-AES--256%20CFB-red.svg)](https://cryptography.io/)
-[![S/MIME](https://img.shields.io/badge/Email-S%2FMIME%20Signed%20Alerts-purple.svg)](docs/architecture_and_crypto.md)
-[![Publication](https://img.shields.io/badge/Paper-IEEE%20Format%20PDF-brightgreen.svg)](docs/papers/Secure_Client_Server_Communication_SSL_RSA_AES.pdf)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/)
+[![Security SSL/TLS](https://img.shields.io/badge/Security-SSL%2FTLS-green.svg)](https://www.openssl.org/)
+[![Encryption RSA-AES](https://img.shields.io/badge/Encryption-Hybrid--RSA--AES-orange.svg)]()
+[![QKD BB84](https://img.shields.io/badge/Quantum-BB84--QKD-purple.svg)]()
+[![Signature PSS](https://img.shields.io/badge/Signature-RSA--PSS-teal.svg)]()
+[![S/MIME Alert](https://img.shields.io/badge/Notification-S%2FMIME-red.svg)]()
 
-A high-performance, multi-layered enterprise cybersecurity communication system engineered to guarantee **confidentiality, data integrity, non-repudiation, and sender authenticity** across public networks.
-
-The system combines **Transport Layer Security (SSL/TLS)**, **Hybrid RSA-AES Cryptography**, **RSA PSS Digital Signatures**, **BB84 Quantum Key Distribution (QKD) simulation**, and **S/MIME signed automated email alert notifications**.
-
----
-
-## Key Features & Security Architecture
-
-1. **Transport Layer Security (SSL/TLS)**
-   - Wraps raw TCP socket streams in encrypted SSL/TLS sessions using X.509 server certificates (`certs/server.crt`).
-   - Protects against network eavesdropping, packet sniffing, and Man-in-the-Middle (MITM) attacks.
-
-2. **Hybrid RSA-AES Cryptographic Architecture**
-   - **Bulk Message Encryption (AES-256-CFB)**: Employs 256-bit symmetric Advanced Encryption Standard (AES) for ultra-fast payload encryption with low CPU overhead.
-   - **Key Encapsulation (RSA-2048 OAEP)**: Encrypts one-time 256-bit AES keys using 2048-bit RSA public key cryptography with Optimal Asymmetric Encryption Padding (OAEP + SHA256).
-
-3. **RSA PSS Digital Signatures & Non-Repudiation**
-   - Generates digital signatures over the ciphertext payload using RSA Probabilistic Signature Scheme (PSS + SHA256) and the sender's private key.
-   - Verifies authenticity and detects any payload tampering prior to decryption.
-
-4. **Quantum Key Distribution (BB84 Protocol Simulation)**
-   - Simulates quantum polarization basis exchange (BB84) to negotiate a quantum-resistant shared secret during client-server setup.
-
-5. **S/MIME Authenticated Email Notifications**
-   - Automatically dispatches S/MIME signed email alerts via SMTP when clients connect or disconnect, tracking session duration and IP addresses.
+A production-grade, multi-layered secure client-server communication suite that unifies quantum key distribution and hybrid classical cryptography. This repository serves as the official joint implementation of **two peer-reviewed research publications**:
+1. **Secure client-server communication using SSL and hybrid RSA and AES algorithm encryption**
+2. **Multi-Client Server based Quantum Key Distribution**
 
 ---
 
-## System Architecture & Cryptographic Workflow
+## Technical Architecture & Security Flow
 
-### Multi-Layer Security Flowchart
-
-```mermaid
-graph TD
-    subgraph Client Node
-        A[Input Plaintext Message] --> B[Generate One-Time 256-bit AES Key & 128-bit IV]
-        B --> C[Encrypt Payload with AES-256-CFB]
-        B --> D[Encrypt AES Key with Server RSA Public Key OAEP]
-        C --> E[Assemble Payload: IV + Encrypted AES Key + Ciphertext]
-        D --> E
-        E --> F[Generate RSA PSS Digital Signature using Client Private Key]
-        F --> G[Format Wire Payload: recipient_id : payload_hex : signature_hex]
-    end
-
-    subgraph Transport Security
-        G --> H[Transmit over SSL/TLS Encrypted Socket Stream]
-    end
-
-    subgraph Server Gateway Node
-        H --> I[Verify RSA PSS Signature using Client Public Key]
-        I -- Valid --> J[Decrypt AES Key using Server RSA Private Key OAEP]
-        I -- Invalid --> K[Reject Payload & Log Security Violation]
-        J --> L[Decrypt Ciphertext using AES-256-CFB]
-        L --> M[Route Decrypted Message to Target Recipient]
-    end
+```
++-----------------------------------------------------------------------------------+
+|                           Layer 1: Application Data                               |
++-----------------------------------------------------------------------------------+
+                                          |
+                                          v
++-----------------------------------------------------------------------------------+
+|               Layer 2: BB84 Quantum Key Distribution (QKD) Protocol               |
+| - Quantum bit & polarization basis exchange (Rectilinear + / Diagonal x).        |
+| - Sifted secret key negotiation for quantum-resistant session security.           |
++-----------------------------------------------------------------------------------+
+                                          |
+                                          v
++-----------------------------------------------------------------------------------+
+|                  Layer 3: AES-256 Bulk Data Encryption (CFB Mode)                 |
+| - Fast, low-latency symmetric payload encryption using 256-bit AES & 128-bit IV.  |
++-----------------------------------------------------------------------------------+
+                                          |
+                                          v
++-----------------------------------------------------------------------------------+
+|         Layer 4: RSA-2048 Asymmetric Key Encapsulation (OAEP + SHA-256)           |
+| - Encapsulates one-time 256-bit AES key using recipient's RSA public key.         |
++-----------------------------------------------------------------------------------+
+                                          |
+                                          v
++-----------------------------------------------------------------------------------+
+|             Layer 5: RSA-2048 Digital Signature Generation (PSS + SHA-256)        |
+| - Generates non-repudiable digital signature over payload for integrity & origin. |
++-----------------------------------------------------------------------------------+
+                                          |
+                                          v
++-----------------------------------------------------------------------------------+
+|               Layer 6: SSL/TLS Secure Transport Session (X.509 Cert)             |
+| - Encapsulates all TCP wire traffic in encrypted SSL/TLS session (Port 9999).     |
++-----------------------------------------------------------------------------------+
+                                          |
+                                          v
++-----------------------------------------------------------------------------------+
+|               Layer 7: S/MIME Authenticated Email Server Alerts                   |
+| - Dispatches PKCS1v15 + SHA256 signed email alerts on client connect/disconnect. |
++-----------------------------------------------------------------------------------+
 ```
 
 ---
 
-## Mathematical Formulations
+## Cryptographic Protocol Sequence
 
-### 1. Hybrid Encryption Formulation
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client
+    participant Server
 
-For a message $M$, a 256-bit symmetric key $K_{AES} \leftarrow \{0,1\}^{256}$ and 128-bit initialization vector $IV \leftarrow \{0,1\}^{128}$ are generated. The payload ciphertext $C_{msg}$ is computed:
+    Client->>Server: 1. Initiate TCP Connection (Port 9999)
+    Server-->>Client: 2. SSL/TLS Handshake & Server X.509 Certificate (`server.crt`)
+    Note over Client,Server: SSL/TLS Secure Socket Encapsulation Established
 
-$$C_{msg} = \text{AES-256-CFB}_{K_{AES}, IV}(M)$$
+    Server->>Client: 3. Send BB84 Random Polarization Bases & Qubit Bits
+    Client->>Server: 4. Send Client Measurement Bases
+    Note over Client,Server: BB84 Sifted Quantum Key Negotiated
 
-The key $K_{AES}$ is encapsulated with the recipient's 2048-bit RSA public key $K_{pub}^{rec}$:
+    Server->>Client: 5. Transmit Server RSA-2048 Public Key (PEM)
+    Client->>Server: 6. Transmit Client RSA-2048 Public Key (PEM)
+    Note over Client,Server: RSA Asymmetric Public Keys Exchanged
 
-$$C_{key} = \text{RSA-OAEP}_{K_{pub}^{rec}}(K_{AES})$$
-
-The total encrypted package $C$ is concatenated:
-
-$$C = IV \mathbin{\Vert} C_{key} \mathbin{\Vert} C_{msg}$$
-
-### 2. Digital Signature & Verification Formulation
-
-A digital signature $\sigma$ is computed over $C$ using the sender's private key $K_{priv}^{send}$:
-
-$$\sigma = \text{RSA-PSS-Sign}_{K_{priv}^{send}}(C, \text{SHA-256})$$
-
-The recipient verifies the signature prior to decryption:
-
-$$\text{Verify}_{K_{pub}^{send}}(C, \sigma) = \begin{cases} 1 & \text{Signature Valid (Integrity Confirmed)} \\ 0 & \text{Signature Invalid (Payload Tampered)} \end{cases}$$
-
----
-
-## Performance Benchmark: Traditional RSA vs. Hybrid RSA-AES
-
-| Metric | Traditional RSA (2048-bit) | Hybrid RSA-AES (Proposed) | Improvement |
-| :--- | :--- | :--- | :--- |
-| **Max Payload Size** | Restricted to ~190 bytes per block | Unlimited payload capacity | **Infinite** |
-| **Encryption Throughput** | Slow (~1.2 MB/s) | High Speed (~350+ MB/s) | **~300x Acceleration** |
-| **Computational Cost** | Exponential with message size $O(N^3)$ | Constant key overhead $O(1) + O(N)$ | **Significant CPU Drop** |
-| **Security Guarantees** | Confidentiality only | Confidentiality, Integrity, & Non-repudiation | **Multi-layered** |
+    Client->>Server: 7. Transmit Wire Payload: `recipient_id:encrypted_hex:signature_hex`
+    Note over Server: A. Verify RSA-PSS Signature using Client Public Key<br/>B. Decrypt AES Key via Server RSA Private Key (OAEP)<br/>C. Decrypt Payload via AES-256-CFB
+    Server-->>Client: 8. Relay Decrypted Message to Target Recipient Client
+```
 
 ---
 
 ## Repository Directory Structure
 
 ```
-Secure-Client-Server-SSL-RSA-AES/
+Secure-Client-Server-SSL-RSA-AES-QKD/
 ├── src/
-│   ├── server.py              # Multithreaded SSL/TLS server with hybrid RSA-AES decryption & S/MIME notifications
-│   └── client.py              # Interactive SSL/TLS client with RSA key generation & payload signing
+│   ├── server.py              # Multithreaded SSL/TLS server with QKD, RSA-AES hybrid decryption & S/MIME alerts
+│   └── client.py              # Interactive SSL/TLS client with QKD basis exchange & RSA payload signing
 ├── scripts/
 │   └── generate_certs.sh      # Automated bash script for local SSL/TLS certificate generation
+├── tests/
+│   └── test_communication.py  # End-to-end automated cryptographic integration test suite
 ├── certs/
 │   ├── server.crt             # X.509 Server SSL Public Certificate (Public)
 │   └── server.key             # Server 2048-bit RSA Private Key (Ignored in .gitignore)
@@ -121,12 +105,13 @@ Secure-Client-Server-SSL-RSA-AES/
 │   ├── openssl.cnf            # OpenSSL certificate generation configuration blueprint
 │   └── config.txt             # Environment configuration file
 ├── docs/
-│   ├── architecture_and_crypto.md # Comprehensive technical & cryptographic specification
+│   ├── architecture_and_crypto.md # Detailed mathematical & protocol reference guide
 │   └── papers/
-│       └── Secure_Client_Server_Communication_SSL_RSA_AES.pdf # Full research paper PDF
-├── .gitignore                 # Python & security key ignore rules
-├── requirements.txt           # Python dependency requirements
-└── README.md                  # Detailed publication-grade documentation
+│       ├── Secure_Client_Server_Communication_SSL_RSA_AES.pdf # Paper #1 PDF
+│       └── Multi_Client_Server_based_Quantum_Key_Distribution.pdf # Paper #2 PDF
+├── .gitignore                 # Python cache & security key ignore rules
+├── requirements.txt           # Python dependency specifications
+└── README.md                  # Comprehensive project documentation
 ```
 
 ---
@@ -136,15 +121,13 @@ Secure-Client-Server-SSL-RSA-AES/
 > [!IMPORTANT]
 > - **Private Keys (`server.key`)**: Private key files are **strictly excluded** from version control via `.gitignore` to prevent secret leakage and unauthorized server impersonation.
 > - **OpenSSL Configuration (`config/openssl.cnf`)**: The template `openssl.cnf` contains zero sensitive data and is intentionally committed so developers can reproduce compatible certificates on any machine.
-> - **Local Certificate Generation**: Developers can generate fresh, matched key pairs locally using the provided script prior to starting the server.
+> - **Local Certificate Generation**: Developers can generate fresh, matched key pairs locally using `./scripts/generate_certs.sh` prior to running the system.
 
 ---
 
-## Installation & Execution Guide
+## Quickstart & Verification Guide
 
-### 1. Prerequisites & Dependencies
-
-Install required Python packages:
+### 1. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
@@ -152,42 +135,53 @@ pip install -r requirements.txt
 
 ### 2. Generate Local SSL/TLS Certificates
 
-Execute the automated certificate generation script:
-
 ```bash
 ./scripts/generate_certs.sh
 ```
 
-*(Alternatively, run manually via OpenSSL: `openssl req -x509 -newkey rsa:2048 -keyout certs/server.key -out certs/server.crt -days 365 -nodes -config config/openssl.cnf`)*
+### 3. Run Automated Integration Test Suite
 
-### 3. Launching the Secure Server
+Run the end-to-end test suite to verify SSL connection wrapping, BB84 QKD basis exchange, RSA key pair generation, AES-256-CFB payload encryption, and RSA-PSS signature verification:
 
-Run the server script from the repository root:
+```bash
+python3 tests/test_communication.py
+```
 
+### 4. Launching Server & Clients Manually
+
+**Terminal 1 (Server)**:
 ```bash
 python3 src/server.py
 ```
 
-### 4. Launching Client Instances
-
-In separate terminal windows, run client instances:
-
+**Terminal 2 (Client 1)**:
 ```bash
 python3 src/client.py
 ```
 
-- Enter the server IP (`127.0.0.1` for localhost).
-- Input target recipient ID (e.g., `2`) and send end-to-end encrypted messages.
+**Terminal 3 (Client 2)**:
+```bash
+python3 src/client.py
+```
+
+- Enter target recipient ID (e.g. `2`) to transmit end-to-end encrypted messages.
 
 ---
 
-## Research Publication & Citation
+## Research Publications & Citations
 
-This repository is the official implementation of the published research paper:
+This repository is the official unified implementation of the following research papers:
 
+### Paper #1: Hybrid RSA-AES & Transport Security
 > **Secure client-server communication using SSL and hybrid RSA and AES algorithm encryption**  
 > *P. Praneeth Reddy, P. Sai Shruthi, M. R. V. Vyshnavi, Nivedh V. Menon*  
 > Department of Computer Science and Engineering, Amrita School of Computing, Bengaluru  
-> Amrita Vishwa Vidyapeetham, India.
+> Amrita Vishwa Vidyapeetham, India.  
+> [PDF Document](docs/papers/Secure_Client_Server_Communication_SSL_RSA_AES.pdf)
 
-The full paper is available in [`docs/papers/Secure_Client_Server_Communication_SSL_RSA_AES.pdf`](docs/papers/Secure_Client_Server_Communication_SSL_RSA_AES.pdf).
+### Paper #2: Quantum Key Distribution Protocol
+> **Multi-Client Server based Quantum Key Distribution**  
+> *P. Praneeth Reddy, P. Sai Shruthi, P. Tharneesh, Nivedh V. Menon, Shinu M. R.*  
+> Department of Computer Science and Engineering, Amrita School of Computing, Bengaluru  
+> Amrita Vishwa Vidyapeetham, India.  
+> [PDF Document](docs/papers/Multi_Client_Server_based_Quantum_Key_Distribution.pdf)

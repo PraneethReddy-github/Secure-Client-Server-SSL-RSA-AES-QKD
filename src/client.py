@@ -14,22 +14,38 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CERTS_DIR = os.path.join(BASE_DIR, "certs")
 CERT_FILE = os.path.join(CERTS_DIR, "server.crt")
 
-# --- QKD Key Exchange (Client Side) ---
+# --- Reliable TCP Socket Recv Helper ---
+def recv_exact(sock, n):
+    data = bytearray()
+    while len(data) < n:
+        packet = sock.recv(n - len(data))
+        if not packet:
+            return None
+        data.extend(packet)
+    return bytes(data)
+
+# --- BB84 Quantum Key Distribution (QKD) Client Handler ---
 def qkd_key_exchange(client_socket):
     key_size = 128
     
-    server_bases = list(client_socket.recv(key_size))
-    server_bits = list(client_socket.recv(key_size))
+    server_bases_raw = recv_exact(client_socket, key_size)
+    server_bits_raw = recv_exact(client_socket, key_size)
+    
+    if not server_bases_raw or not server_bits_raw:
+        raise Exception("QKD failed: Server disconnected during initial basis/bit transfer.")
+
+    server_bases = list(server_bases_raw)
+    server_bits = list(server_bits_raw)
     
     client_bases = [random.randint(0, 1) for _ in range(key_size)]
     client_socket.sendall(bytes(client_bases))
     
-    shared_key = []
+    sifted_key = []
     for i in range(key_size):
         if client_bases[i] == server_bases[i]:
-            shared_key.append(server_bits[i])
+            sifted_key.append(server_bits[i])
             
-    return bytes(shared_key[:len(shared_key)//2])
+    return bytes(sifted_key[:len(sifted_key)//2])
 
 def receive_messages(client_socket):
     try:
@@ -41,7 +57,7 @@ def receive_messages(client_socket):
             else:
                 break
     except Exception as e:
-        print(f"\n[DISCONNECTED] Connection closed by server: {e}")
+        print(f"\n[DISCONNECTED] Connection closed by server.")
 
 def send_messages(client_socket, private_key, server_public_key):
     try:
@@ -96,7 +112,7 @@ def send_messages(client_socket, private_key, server_public_key):
 
 def main():
     print("==========================================================================")
-    print("  Secure Client Interface (SSL/TLS + Hybrid RSA-AES Encryption)")
+    print("  Secure Client Interface (SSL/TLS + QKD + Hybrid RSA-AES Encryption)")
     print("==========================================================================")
 
     if not os.path.exists(CERT_FILE):
@@ -124,9 +140,9 @@ def main():
         print(f"Error connecting to server: {conn_err}")
         sys.exit(1)
 
-    # 1. Quantum Key Exchange (BB84 Simulation)
-    qkd_symmetric_key = qkd_key_exchange(ssl_client_socket)
-    print(f"[QKD] Shared Quantum Key (Hex): {qkd_symmetric_key.hex()}")
+    # 1. Execute Quantum Key Distribution (BB84 Protocol)
+    qkd_key = qkd_key_exchange(ssl_client_socket)
+    print(f"[QKD SUCCESS] Negotiated Shared Quantum Key (Hex): {qkd_key.hex()}")
 
     # 2. RSA Key Pair Generation for Client
     client_private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -141,7 +157,7 @@ def main():
         format=serialization.PublicFormat.SubjectPublicKeyInfo
     )
     ssl_client_socket.sendall(client_public_pem)
-    print("[HANDSHAKE] RSA Public Keys Exchanged Successfully. Secure Channel Ready.")
+    print("[HANDSHAKE] SSL + QKD + RSA Public Keys Exchanged Successfully. Secure Channel Ready.")
 
     # Start threads for bidirectional messaging
     recv_thread = threading.Thread(target=receive_messages, args=(ssl_client_socket,))
