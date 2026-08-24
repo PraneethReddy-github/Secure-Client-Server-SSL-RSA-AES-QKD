@@ -1,0 +1,28 @@
+# Python Cache & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environments
+venv/
+env/
+ENV/
+
+# Private Keys & Sensitive Security Credentials (DO NOT COMMIT PRODUCTION KEYS)
+*.key
+*.pem
+certs/*.key
+certs/*.pem
+# certs/server.crt  # Optional: keep sample cert or ignore generated certs
+
+# IDE Configs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS Files
+.DS_Store
+Thumbs.db
