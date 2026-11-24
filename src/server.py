@@ -33,9 +33,9 @@ def recv_exact(sock, n):
 
 # --- S/MIME Email Notification Function ---
 def send_email_notification(subject, body):
-    sender_email = os.environ.get("SENDER_EMAIL", "bl.en.u4cse21142@bl.students.amrita.edu")
+    sender_email = os.environ.get("SENDER_EMAIL", "")
     sender_password = os.environ.get("SENDER_PASSWORD", None)
-    receiver_email = os.environ.get("RECEIVER_EMAIL", "praneethreddy.pr003@gmail.com")
+    receiver_email = os.environ.get("RECEIVER_EMAIL", "")
 
     if not sender_password or sender_password == "YOUR_PASSWORD_HERE":
         print("[NOTIF] S/MIME email notification skipped (SENDER_PASSWORD environment variable not configured).")
